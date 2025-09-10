@@ -4,18 +4,18 @@ import { supabase } from "../supabase/supabase"; // Adjust path to your supabase
 
 // Define colors for the pie chart slices
 const COLORS = {
-  'Pending': '#fb923c', // Tailwind orange-400
-  'Completed': '#3b82f6', // Tailwind blue-500
+  'Pending': '#ed7009', // Tailwind orange-400
+  'Completed': '#1ecc14', // Tailwind blue-500
 };
 
-export default function AnalyticsPieChart() {
+export default function AnalyticsPieChart({user,role}) {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // This function fetches the stats and formats them for the chart
     const fetchAndSetChartData = async () => {
-      const { data, error } = await supabase.rpc('get_report_stats');
+      const { data, error } = await supabase.rpc('get_report_stats', { dept:  role==='admin' ? user?.user_metadata?.department : 'All'  });
 
       if (error) {
         console.error("Error fetching chart data:", error);
@@ -50,7 +50,7 @@ export default function AnalyticsPieChart() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user,role]);
 
   if (loading) {
     return <div className="p-4 text-center text-slate-500">Loading chart...</div>;
@@ -66,12 +66,12 @@ export default function AnalyticsPieChart() {
 
   return (
     // UPDATED: Removed h-full for more predictable sizing in a grid.
-    <div className="w-full p-6 bg-white rounded-xl shadow-md flex flex-col">
-      <h3 className="text-lg font-semibold text-slate-700 mb-4 flex-shrink-0">
+    <div className="w-full p-6 bg-linear-to-br from-[#fdeff9] via-[#7303c0] to-[#ec38bc] rounded-xl shadow-md flex flex-col">
+      <h3 className="text-xl font-bold text-slate-800 mb-4 flex-shrink-0">
         Reports Overview
       </h3>
       {/* This div now has a fixed height to ensure consistent rendering */}
-      <div className="w-full h-64">
+      <div className="w-full h-65 bg-linear-to-br from-white/15 to-white/25 shadow-2xl rounded-2xl backdrop-blur-sm">
         <ResponsiveContainer>
           <PieChart>
             <Pie
@@ -79,10 +79,11 @@ export default function AnalyticsPieChart() {
               cx="50%"
               cy="50%"
               labelLine={false}
-              outerRadius="85%" // Use percentage for responsiveness
-              fill="#8884d8"
+              outerRadius="75%" // Use percentage for responsiveness
+              fill="#8884d4"
               dataKey="value"
               nameKey="name"
+              spacing={10}
               // A cleaner label showing just the percentage
               label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
             >
@@ -98,7 +99,7 @@ export default function AnalyticsPieChart() {
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
               }}
             />
-            <Legend iconType="circle" verticalAlign="bottom" height={36}/>
+            <Legend iconType="circle" verticalAlign="bottom" height={30}/>
           </PieChart>
         </ResponsiveContainer>
       </div>
