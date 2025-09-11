@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { supabase } from './supabase/supabase';
@@ -11,8 +11,9 @@ import ReportdetailsPage from './pages/ReportdetailsPage';
 
 const AppContent = () => {
   const [user, setUser] = useState(null);
-  const [role,setRole] = useState('');
-  const [loading, setLoading] = useState(true); // ⏳ wait until we know auth state
+  const [role, setRole] = useState(null);
+  const [department, setDepartment] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [allReports, setAllReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,77 +22,48 @@ const AppContent = () => {
     department: 'All',
   });
 
-  const navigate = useNavigate();
-
-  // --- Check auth state on mount ---
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("role")
-          .eq("user_id", user.id)   // ✅ fixed
-          .single();
+  const fetchUserProfile = async (session) => {
+    if (!session?.user) {
+      setUser(null);
+      setRole(null);
+      setDepartment(null);
+      return;
+    }
 
-        if (userError) {
-          console.error("Error fetching user info:", userError);
-          return;
-        }
+    setUser(session.user);
 
-        console.log("Role:", userData.role);
-        setRole(userData.role);
+    const { data: userData, error } = await supabase
+      .from("users")
+      .select("role, department")
+      .eq("user_id", session.user.id)
+      .single();
 
-      if (user) {
-        navigate('/'); // ✅ logged in → dashboard
-      } else {
-        navigate('/login'); // ❌ logged out → login
-      }
-    };
-    getUser().finally(() => setLoading(false));
+    if (!error && userData) {
+      setRole(userData.role);
+      setDepartment(userData.department);
+    } else {
+      console.error("Error fetching profile:", error);
+    }
+  };
 
-    // Subscribe to auth changes (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const newUser = session?.user ?? null;
-      setUser(newUser);
+  // 1️⃣ On mount
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    fetchUserProfile(session);
+    setLoading(false);
+  });
 
-      if (!newUser) {
-        // clear state on logout
-        setRole('');
-        setAllReports([]);
-        navigate('/login');
-        return;
-      }
+  // 2️⃣ On auth change
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    fetchUserProfile(session);
+  });
 
-      // user logged in: fetch role immediately
-      try {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role, department')
-          .eq('user_id', newUser.id)
-          .single();
+  return () => subscription.unsubscribe();
+}, []);
 
-        if (!userError && userData) {
-          setRole(userData.role);
-          // optionally set department state if you track it separately
-          // setDepartment(userData.department);
-        } else {
-          setRole(''); // fallback
-        }
-        navigate('/');
-      } catch (err) {
-        console.error('Error fetching role on auth change', err);
-        setRole('');
-        navigate('/');
-      }finally{
-        setLoading(false)
-      }
-    });
 
-    return () => subscription.unsubscribe();
-  }, []);
 
-  // --- Filtering logic ---
+  // --- Filtering logic (No changes needed) ---
   const filteredReports = useMemo(() => {
     return allReports.filter(report => {
       const statusMatch = report.status === filters.status;
@@ -101,16 +73,26 @@ const AppContent = () => {
     });
   }, [allReports, filters, searchTerm]);
 
-  // --- Fetch reports when logged in ---
+  // --- Fetch reports when logged in (No changes needed) ---
   useEffect(() => {
-    if (!user) return;
+    if (!user || !role) return;
 
     const fetchAllReports = async () => {
-      const { data } = role === 'admin' ? await supabase.from("reports").select("*").eq('department', user?.user_metadata?.department )
-            : await supabase.from("reports").select("*")
+      let query = supabase.from("reports").select("*");
       
-      if (data) setAllReports(data);
+      if (role === 'admin' && department) {
+        query = query.eq('department', department);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching reports:", error);
+      } else if (data) {
+        setAllReports(data);
+      }
     };
+    
     fetchAllReports();
 
     const channel = supabase
@@ -121,10 +103,13 @@ const AppContent = () => {
       })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
-  }, [user,role]);
+    return () => {
+      supabase.removeChannel(channel);
+      setAllReports([]);
+    };
+  }, [user, role, department]);
 
-  // --- Handlers ---
+  // --- Handlers (No changes needed) ---
   const handleFiltersChange = useCallback((newFilters) => {
     setFilters({
       status: newFilters.status,
@@ -138,56 +123,68 @@ const AppContent = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen text-white">Loading...</div>;
+    return (
+      <div className="flex justify-center items-center h-screen bg-primary text-white">
+        Loading...
+      </div>
+    );
   }
 
   return (
-    <div className="flex h-screen bg-hero font-dm-sans">
-      {user && (
-        <SideBar
-          user={user}
-          isFiltering={isFiltering}
-          onClose={() => setIsFiltering(false)}
-          allReports={allReports}
-          reports={filteredReports}
-          onFiltersChange={handleFiltersChange}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          role={role}
-        />
-      )}
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              user ? (
-                <Dashboard
-                  user={user}
-                  filteredReports={filteredReports}
-                  handleReportResolve={handleReportResolve}
-                  setIsFiltering={setIsFiltering}
-                  searchTerm={searchTerm}
-                  setSearchTerm={setSearchTerm}
-                  role={role}
-                />
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
+    <main>
+      <div className="flex h-screen font-dm-sans">
+        {user && (
+          <SideBar
+            user={user}
+            isFiltering={isFiltering}
+            onClose={() => setIsFiltering(false)}
+            allReports={allReports}
+            reports={filteredReports}
+            onFiltersChange={handleFiltersChange}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            role={role}
+            setAllReports={setAllReports}
+            setRole={setRole}
+            setUser={setUser}
+            department={department}
+            loading={loading}
+            setDepartment={setDepartment}
           />
-          <Route
-            path="/reports/:id"
-            element={user ? <ReportdetailsPage /> : <Navigate to="/login" />}
-          />
-          
-          <Route
-            path="/login"
-            element={user ? <Navigate to="/" /> : <AuthPage />}
-          />
-        </Routes>
+        )}
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                user ? (
+                  <Dashboard
+                    user={user}
+                    filteredReports={filteredReports}
+                    handleReportResolve={handleReportResolve}
+                    setIsFiltering={setIsFiltering}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    role={role}
+                    department={department}
+                  />
+                ) : (
+                  <Navigate to="/login" />
+                )
+              }
+            />
+            <Route
+              path="/reports/:id"
+              element={user ? <ReportdetailsPage /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/login"
+              element={user ? <Navigate to="/" /> : <AuthPage />}
+            />
+          </Routes>
+        </div>
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -13,48 +13,49 @@ function StatCard({ title, value, color}) {
   );
 }
 
-export default function AnalyticsDashboard({user,role}) {
+export default function AnalyticsDashboard({user,role,department}) {
   const [stats, setStats] = useState({ total: 0, pending: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Function to fetch the stats from our database function
     const fetchStats = async () => {
-  
-    const { data, error } = await supabase.rpc('get_report_stats', { dept: role==='admin' ? user?.user_metadata?.department : 'All' });
+      // Logic is correct: uses department for admin, 'All' otherwise.
+      const { data, error } = await supabase.rpc('get_report_stats', { dept: role === 'admin' ? department : 'All' });
   
       if (error) {
         console.error("Error fetching stats:", error);
-      } else {
+      } else if (data) {
         setStats(data);
       }
       setLoading(false);
     };
   
-    // Fetch initial data
-    fetchStats();
+    // Only fetch if we have the necessary data
+    if (role) {
+       fetchStats();
+    }
 
-    // Set up a real-time subscription to re-fetch data on any change
     const channel = supabase
       .channel('reports-stats-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'reports' },
         () => {
-          // When any report is inserted, updated, or deleted, fetch the stats again
-          fetchStats();
+          if (role) { // Re-fetch on changes
+            fetchStats();
+          }
         }
       )
       .subscribe();
 
-    // Cleanup function to remove the subscription
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user,role]);
+    // Add `department` to dependency array to refetch when it changes.
+  }, [user, role, department]);
 
-  if (loading) {
-    return <div className="p-4 text-center ">Loading analytics...</div>;
+  if (loading || !role) {
+    return <div className="p-4 text-center text-zinc-400">Loading analytics...</div>;
   }
 
   return (

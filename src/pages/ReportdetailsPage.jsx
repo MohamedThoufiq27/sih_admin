@@ -25,7 +25,9 @@ const ReportDetails = () => {
   return (
     <div className="p-6 text-white">
       <h1 className="text-2xl font-bold mb-4">{report.department}</h1>
+      <img src={report.image_url} alt='report-img' />
       <p className="mb-2">{report.description}</p>
+      
       <p className="text-sm text-gray-400">Status: {report.status}</p>
     </div>
   );

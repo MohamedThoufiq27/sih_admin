@@ -8,14 +8,14 @@ const COLORS = {
   'Completed': '#1ecc14', // Tailwind blue-500
 };
 
-export default function AnalyticsPieChart({user,role}) {
+export default function AnalyticsPieChart({user,role,department}) {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // This function fetches the stats and formats them for the chart
     const fetchAndSetChartData = async () => {
-      const { data, error } = await supabase.rpc('get_report_stats', { dept:  role==='admin' ? user?.user_metadata?.department : 'All'  });
+      const { data, error } = await supabase.rpc('get_report_stats', { dept:  role==='admin' ? department : 'All'  });
 
       if (error) {
         console.error("Error fetching chart data:", error);
@@ -39,7 +39,7 @@ export default function AnalyticsPieChart({user,role}) {
       .channel('reports-piechart-changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'reports' },
+        { event: '*', schema: 'public', table: 'reports', },
         () => {
           fetchAndSetChartData();
         }
@@ -50,10 +50,10 @@ export default function AnalyticsPieChart({user,role}) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user,role]);
+  }, [user,role,department]);
 
-  if (loading) {
-    return <div className="p-4 text-center text-slate-500">Loading chart...</div>;
+  if (loading || !role) {
+    return <div className="p-4 text-center text-lg text-slate-400">Loading chart...</div>;
   }
   
   if (chartData.every(item => item.value === 0)) {

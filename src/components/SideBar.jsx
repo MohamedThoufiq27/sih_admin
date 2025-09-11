@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { LayoutDashboard, BarChart, Settings, Search, ListFilter, CheckCircle, Clock, X, LogOut } from 'lucide-react';
 import { supabase } from '../supabase/supabase';
-import { toast } from 'react-toastify';
+// import { toast } from 'react-toastify';
 
 const Logo = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-indigo-500">
@@ -12,10 +12,17 @@ const Logo = () => (
   </svg>
 );
 
-const SideBar = ({ user, isFiltering, onClose, allReports, reports, onFiltersChange, searchTerm, setSearchTerm,role }) => {
+const SideBar = ({ user, isFiltering, onClose, allReports, reports, onFiltersChange, searchTerm, setSearchTerm,role,department,setUser, setRole, setDepartment, loading}) => {
   const location = useLocation();
   const navigate = useNavigate();
-  console.log(user);
+  if (loading) {
+    return (
+      <aside className="w-64 shrink-0 bg-primary border-r border-slate-800 p-4 flex flex-col items-center justify-center">
+        <Logo />
+        <span className="text-slate-400 mt-4">Loading user...</span>
+      </aside>
+    );
+  }
   if (!user) {
     return (
       <aside className="w-64 shrink-0 bg-primary border-r border-slate-800 p-4 flex flex-col items-center justify-center">
@@ -52,7 +59,13 @@ const SideBar = ({ user, isFiltering, onClose, allReports, reports, onFiltersCha
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setRole(null);
+    setDepartment(null);
+    navigate("/login");
+  };
 
   return (
     <aside className="w-64 shrink-0 bg-primary border-r border-slate-800 p-4 flex flex-col justify-between">
@@ -89,14 +102,10 @@ const SideBar = ({ user, isFiltering, onClose, allReports, reports, onFiltersCha
           {role}
         </p>
         <p className="text-sm text-slate-400 truncate mb-2">
-          {user.user_metadata.department}
+          {department}
         </p>
         <button 
-          onClick={async () => {
-            const { error } = await supabase.auth.signOut();
-            if (!error) toast.success("Logged out successfully!");
-          }}
-          
+          onClick={handleLogout}
           className="flex items-center space-x-2 w-full text-left px-3 py-2 text-sm rounded-lg bg-slate-800 text-slate-300 hover:bg-red-500 hover:text-white"
         >
           <LogOut className="h-4 w-4" />
