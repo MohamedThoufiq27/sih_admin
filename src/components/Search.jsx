@@ -35,7 +35,7 @@ const SearchComponent = ({ searchTerm, setSearchTerm, onFocus }) => {
         ref={searchInputRef}
         type="text"
         value={searchTerm}
-        placeholder="Search Reports..."
+        placeholder="Search Reports . . ."
         onFocus={onFocus} // <-- This will trigger the modal
         onChange={(e) => setSearchTerm(e.target.value)}
         className="

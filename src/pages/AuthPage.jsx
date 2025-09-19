@@ -1,135 +1,117 @@
-import { useState } from "react"
-import { supabase } from "../supabase/supabase"
-import { toast } from "react-toastify"
+import { useState, useEffect } from "react";
+import { supabase } from "../supabase/supabase"; // Assuming you have this file
+import { toast } from "react-toastify";
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState("")
-  const [department,setDepartment] = useState('');
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Handle Login
+  // --- NEW: State for department logic ---
+  const [departmentId, setDepartmentId] = useState(''); // Stores the selected department's ID
+  const [departments, setDepartments] = useState([]); // Stores the list of all departments
+
+  // --- NEW: Fetch departments from the database when the component loads ---
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      const { data, error } = await supabase.from('departments').select('id, name');
+      if (error) {
+        console.error("Error fetching departments:", error);
+      } else {
+        setDepartments(data);
+      }
+    };
+    fetchDepartments();
+  }, []);
+
+  // Handle Login (No changes needed for this function)
   const handleLogin = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
       
       if (error) {
-        alert(error.message)
-        return
+        toast.error(error.message);
+        return;
       }
-
-      const user = data.user
-      if (user) {
-        const { error: profileError } = await supabase
-          .from("users")
-          .select("department")
-          .eq("user_id", user.id)
-          .single()
-          
-        if (profileError) {
-          console.error("Profile fetch error:", profileError)
-        }
-        
-        toast.success(`Login successful!`)
-        
-      }
+      
+      toast.success(`Login successful!`);
+      // The main App component will handle fetching user profile data after this
     
     } catch (err) {
-      console.error("Login error:", err)
-      alert("An unexpected error occurred during login")
+      console.error("Login error:", err);
+      toast.error("An unexpected error occurred during login");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Handle Register - Fixed version with metadata approach
+  // --- UPDATED: Handle Register function for the new schema ---
   const handleRegister = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
     try {
-      // Sign up the user with department in metadata
-      const { data, error } = await supabase.auth.signUp({
+      // Step 1: Sign up the user in the 'auth' schema.
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            department: department, // Store department in user metadata
-            role:'admin',
-            email: email
-          }
-        }
-      })
+      });
 
-      if (error) {
-        alert(error.message)
-        return
+      if (authError) {
+        toast.error(authError.message);
+        return;
       }
 
-      console.log("Signup data:", data) // Debug log
-
-      // If using the trigger approach, the user profile will be created automatically
-      // If not using triggers, manually insert the data
-      const userId = data.user?.id
-
-      if (!userId) {
-        alert("User ID not found after registration")
-        return
+      if (!authData.user) {
+        toast.error("Registration failed, please try again.");
+        return;
       }
 
-      // Try to insert manually as backup (in case trigger doesn't work)
-      try {
-        const { data: insertData, error: insertError } = await supabase
-          .from("users")
-          .upsert([{
-            user_id: userId,
-            department: department,
-            role:'admin',
-            email: email,
-            created_at: new Date().toISOString()
-          }], {
-            onConflict: 'user_id'
-          })
-          .select()
+      // Step 2: Insert a new profile into the 'public.users' table.
+      const { error: insertError } = await supabase
+        .from("users")
+        .insert([{
+          user_id: authData.user.id,
+          email: email,
+          role: 'admin', // Assigning a default role
+          department_id: departmentId, // Use the selected department ID
+        }]);
 
-        if (insertError) {
-          console.error("Manual insert error:", insertError)
-          // Don't show error to user if this fails, as trigger might have handled it
-        } else {
-          console.log("Manual insert successful:", insertData)
-        }
-      } catch (manualInsertErr) {
-        console.log("Manual insert failed (trigger might have handled it):", manualInsertErr)
+      if (insertError) {
+        // This is a critical error, as the user profile wasn't created
+        console.error("Error creating user profile:", insertError);
+        toast.error("Could not create user profile. Please contact support.");
+        return;
       }
 
-      toast.success("Registration successful!")
+      toast.success("Registration successful! Please check your email to verify.");
       
-      // Reset form
-      setEmail("")
-      setPassword("")
-      setDepartment("")
-      setIsLogin(true) // Switch to login mode
+      // Reset form and switch to login
+      setEmail("");
+      setPassword("");
+      setDepartmentId("");
+      setIsLogin(true);
       
     } catch (err) {
-      console.error("Registration error:", err)
-      alert("An unexpected error occurred during registration")
+      console.error("Registration error:", err);
+      toast.error("An unexpected error occurred during registration");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-primary">
-      <div className="w-full max-w-md bg-linear-to-br from-[#C04848] to-[#480048] rounded-2xl shadow-lg p-8">
-        <h2 className="text-2xl font-bold text-center mb-6">
-          {isLogin ? "Login" : "Register"}
+    <div className="flex h-screen items-center justify-center bg-gray-900 text-white">
+      <div className="w-full max-w-md bg-gray-800 rounded-2xl shadow-lg p-8">
+        <h2 className="text-3xl font-bold text-center mb-6">
+          {isLogin ? "Admin Login" : "Admin Registration"}
         </h2>
 
         <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-4">
@@ -138,7 +120,7 @@ export default function AuthPage() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 border-2 border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 bg-gray-700 border-2 border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             required
             disabled={loading}
           />
@@ -148,7 +130,7 @@ export default function AuthPage() {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 border-2 border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-2 bg-gray-700 border-2 border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             required
             disabled={loading}
             minLength={6}
@@ -156,24 +138,25 @@ export default function AuthPage() {
 
           {!isLogin && (
             <div>
-              <label htmlFor="department" className="block text-sm font-medium text-gray-200 mb-1">
+              <label htmlFor="department" className="block text-sm font-medium text-gray-300 mb-1">
                 Department:
               </label>
               <select
                 id="department"
                 name="department"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
                 required
                 disabled={loading}
-                className="w-full px-4 py-2 border-2 border-zinc-700 text-zinc-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 bg-gray-700 border-2 border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">-- Select Department --</option>
-                <option value="Water Supply">Water Supply</option>
-                <option value="Roads">Roads</option>
-                <option value="Sewage">Sewage</option>
-                <option value="Sanitation">Sanitation</option>
-                <option value="Electricity">Electricity</option>
+                {/* --- NEW: Dynamically generate options from fetched departments --- */}
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
               </select>
             </div>
           )}
@@ -181,7 +164,7 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-blue-300 disabled:cursor-not-allowed"
+            className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition disabled:bg-purple-400 disabled:cursor-not-allowed"
           >
             {loading ? "Processing..." : (isLogin ? "Login" : "Register")}
           </button>
@@ -193,7 +176,7 @@ export default function AuthPage() {
               Not registered yet?{" "}
               <span
                 onClick={() => !loading && setIsLogin(false)}
-                className="text-blue-600 cursor-pointer hover:underline"
+                className="text-purple-400 cursor-pointer hover:underline"
               >
                 Sign up
               </span>
@@ -203,7 +186,7 @@ export default function AuthPage() {
               Already registered?{" "}
               <span
                 onClick={() => !loading && setIsLogin(true)}
-                className="text-blue-600 cursor-pointer hover:underline"
+                className="text-purple-400 cursor-pointer hover:underline"
               >
                 Login
               </span>

@@ -6,7 +6,7 @@ import SearchComponent from '../components/Search';
 import { FaExpand, FaCompress } from "react-icons/fa";
 import { User } from 'lucide-react';
 
-const Dashboard = ({ filteredReports, handleReportResolve, setIsFiltering, searchTerm, setSearchTerm ,user ,role,department}) => {
+const Dashboard = ({ filteredReports, handleReportResolve, setIsFiltering, searchTerm, setSearchTerm ,user ,role,department,departmentId}) => {
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const toggleMapExpansion = () => setIsMapExpanded(prev => !prev);
 
@@ -29,8 +29,8 @@ const Dashboard = ({ filteredReports, handleReportResolve, setIsFiltering, searc
           </div>
           <div className="max-w-7xl mx-auto mt-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2"><AnalyticsDashboard user={user} role={role} department={department}/></div>
-              <div className="lg:col-span-1"><AnalyticsPieChart user={user} role={role} department={department}/></div>
+              <div className="lg:col-span-2"><AnalyticsDashboard user={user} role={role} department={department} departmentId={departmentId} /></div>
+              <div className="lg:col-span-1"><AnalyticsPieChart user={user} role={role} department={department} departmentId={departmentId} /></div>
             </div>
           </div>
         </>

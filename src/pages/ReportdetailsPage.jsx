@@ -23,7 +23,7 @@ const ReportDetails = () => {
   if (!report) return <div className="text-white p-4">Loading...</div>;
 
   return (
-    <div className="p-6 text-white">
+    <div className="flex flex-col flex-1 items-center justify-center p-6 text-white">
       <h1 className="text-2xl font-bold mb-4">{report.department}</h1>
       <img src={report.image_url} alt='report-img' />
       <p className="mb-2">{report.description}</p>

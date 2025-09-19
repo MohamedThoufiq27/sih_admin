@@ -13,46 +13,53 @@ function StatCard({ title, value, color}) {
   );
 }
 
-export default function AnalyticsDashboard({user,role,department}) {
+export default function AnalyticsDashboard({user,role,departmentId}) {
   const [stats, setStats] = useState({ total: 0, pending: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      // Logic is correct: uses department for admin, 'All' otherwise.
-      const { data, error } = await supabase.rpc('get_report_stats', { dept: role === 'admin' ? department : 'All' });
-  
+  const fetchStats = async () => {
+    try {
+      const params = role === "admin" ? { dept_id: departmentId } : { dept_id: null };
+
+      // Prevent calling when admin has no departmentId yet
+      if (role === "admin" && !departmentId) return;
+
+      console.log("Fetching stats with:", params);
+
+      const { data, error } = await supabase.rpc("get_report_stats", params);
+
       if (error) {
         console.error("Error fetching stats:", error);
       } else if (data) {
         setStats(data);
       }
-      setLoading(false);
-    };
-  
-    // Only fetch if we have the necessary data
-    if (role) {
-       fetchStats();
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    } finally {
+      setLoading(false); // ✅ always clear loading, success or fail
     }
+  };
 
-    const channel = supabase
-      .channel('reports-stats-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'reports' },
-        () => {
-          if (role) { // Re-fetch on changes
-            fetchStats();
-          }
-        }
-      )
-      .subscribe();
+  if (role) {
+    fetchStats();
+  }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // Add `department` to dependency array to refetch when it changes.
-  }, [user, role, department]);
+  const channel = supabase
+    .channel("reports-stats-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, () => {
+      if (role === "superadmin" || (role === "admin" && departmentId)) {
+        fetchStats();
+      }
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [role, departmentId]);
+
+
 
   if (loading || !role) {
     return <div className="p-4 text-center text-zinc-400">Loading analytics...</div>;

@@ -8,14 +8,14 @@ const COLORS = {
   'Completed': '#1ecc14', // Tailwind blue-500
 };
 
-export default function AnalyticsPieChart({user,role,department}) {
+export default function AnalyticsPieChart({user,role,departmentId}) {
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // This function fetches the stats and formats them for the chart
     const fetchAndSetChartData = async () => {
-      const { data, error } = await supabase.rpc('get_report_stats', { dept:  role==='admin' ? department : 'All'  });
+      const { data, error } = await supabase.rpc('get_report_stats', { dept_id:  role==='admin' ? departmentId : null  });
 
       if (error) {
         console.error("Error fetching chart data:", error);
@@ -50,7 +50,7 @@ export default function AnalyticsPieChart({user,role,department}) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user,role,department]);
+  }, [user,role,departmentId]);
 
   if (loading || !role) {
     return <div className="p-4 text-center text-lg text-slate-400">Loading chart...</div>;

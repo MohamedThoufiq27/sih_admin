@@ -17,8 +17,10 @@ const AppContent = () => {
   const [isFiltering, setIsFiltering] = useState(false);
   const [allReports, setAllReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [departmentId,setDepartmentId]= useState(null);
   const [filters, setFilters] = useState({
     status: 'Not Completed',
+    // department_id:null,
     department: 'All',
   });
 
@@ -28,20 +30,24 @@ const AppContent = () => {
       setUser(null);
       setRole(null);
       setDepartment(null);
+      setDepartmentId(null);
       return;
     }
 
     setUser(session.user);
 
     const { data: userData, error } = await supabase
-      .from("users")
-      .select("role, department")
-      .eq("user_id", session.user.id)
-      .single();
+        .from("users")
+        .select("role, departments(id, name)") // Fetches role from users, and id/name from the related department
+        .eq("user_id", session.user.id)
+        .single();
 
     if (!error && userData) {
       setRole(userData.role);
-      setDepartment(userData.department);
+      setDepartment(userData.departments.name);
+      setDepartmentId(userData.departments.id);
+      console.log(department);
+        
     } else {
       console.error("Error fetching profile:", error);
     }
@@ -59,7 +65,7 @@ const AppContent = () => {
   });
 
   return () => subscription.unsubscribe();
-}, []);
+}, [departmentId,department]);
 
 
 
@@ -78,10 +84,10 @@ const AppContent = () => {
     if (!user || !role) return;
 
     const fetchAllReports = async () => {
-      let query = supabase.from("reports").select("*");
+      let query = supabase.from("reports").select("*, departments(name)");
       
-      if (role === 'admin' && department) {
-        query = query.eq('department', department);
+       if (role === 'admin' && departmentId) {
+        query = query.eq('department_id', departmentId);
       }
 
       const { data, error } = await query;
@@ -107,7 +113,7 @@ const AppContent = () => {
       supabase.removeChannel(channel);
       setAllReports([]);
     };
-  }, [user, role, department]);
+  }, [user, role, department,departmentId]);
 
   // --- Handlers (No changes needed) ---
   const handleFiltersChange = useCallback((newFilters) => {
@@ -150,6 +156,7 @@ const AppContent = () => {
             department={department}
             loading={loading}
             setDepartment={setDepartment}
+            departmentId={departmentId}
           />
         )}
         <div className="flex-1 flex flex-col overflow-y-auto">
