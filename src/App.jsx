@@ -8,6 +8,7 @@ import SideBar from './components/sidebar';
 import Dashboard from './pages/dashboard';
 import AuthPage from './pages/AuthPage';
 import ReportdetailsPage from './pages/ReportdetailsPage';
+import AssignTaskAdmin from './pages/AssignTaskAdmin';
 
 const AppContent = () => {
   const [user, setUser] = useState(null);
@@ -188,6 +189,7 @@ const AppContent = () => {
               path="/login"
               element={user ? <Navigate to="/" /> : <AuthPage />}
             />
+            <Route path="/assign-task-admin" element={<AssignTaskAdmin/>} />
           </Routes>
         </div>
       </div>

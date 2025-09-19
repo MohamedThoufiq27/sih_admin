@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { LayoutDashboard, BarChart, Settings, Search, ListFilter, CheckCircle, Clock, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, BarChart, Settings, Search, ListFilter, CheckCircle, Clock, X, LogOut, Users } from 'lucide-react';
 import { supabase } from '../supabase/supabase';
 // import { toast } from 'react-toastify';
 
@@ -57,6 +57,7 @@ const SideBar = ({ user, isFiltering, onClose, allReports, reports, onFiltersCha
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/analytics', icon: BarChart, label: 'Analytics' },
     { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/assign-task-admin', icon: Users, label: 'Assign Task Admin' },
   ];
 
   const handleLogout = async () => {
