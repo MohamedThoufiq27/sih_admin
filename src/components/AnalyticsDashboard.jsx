@@ -2,75 +2,72 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabase/supabase"; // Adjust the path to your supabase client
 
 // A simple component for a single statistic card
-function StatCard({ title, value, color}) {
+function StatCard({ title, value, color }) {
   return (
-    <div className="flex-1 flex flex-col justify-between items-start p-4 bg-linear-to-br from-white/15 to-white/25 rounded-lg shadow-lg backdrop-blur-2xl">
-      <h3 className="xl:text-4xl md:text-2xl sm:text-xl  text-gray-300 font-bold">{title}</h3>
-      <p className={`xl:text-7xl md:text-4xl sm:text-2xl font-bold ${color}`}>
+    <div className="flex-1 flex flex-col justify-between items-start p-4 bg-gray-800/50 rounded-lg shadow-lg backdrop-blur-sm">
+      <h3 className="text-lg text-gray-300 font-bold">{title}</h3>
+      <p className={`text-5xl font-bold ${color}`}>
         {value}
       </p>
     </div>
   );
 }
 
-export default function AnalyticsDashboard({user,role,departmentId}) {
+// The component is now simpler, only needing the user object.
+export default function AnalyticsDashboard({ user }) {
   const [stats, setStats] = useState({ total: 0, pending: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  const fetchStats = async () => {
-    try {
-      const params = role === "admin" ? { dept_id: departmentId } : { dept_id: null };
-
-      // Prevent calling when admin has no departmentId yet
-      if (role === "admin" && !departmentId) return;
-
-      console.log("Fetching stats with:", params);
-
-      const { data, error } = await supabase.rpc("get_report_stats", params);
-
-      if (error) {
-        console.error("Error fetching stats:", error);
-      } else if (data) {
-        setStats(data);
-      }
-    } catch (err) {
-      console.error("Unexpected error:", err);
-    } finally {
-      setLoading(false); // ✅ always clear loading, success or fail
+    if (!user) {
+      setLoading(false);
+      return;
     }
-  };
 
-  if (role) {
-    fetchStats();
-  }
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        // Calls the new, more powerful database function
+        const { data, error } = await supabase.rpc("get_report_stats_for_role", {
+          p_user_id: user.id,
+        });
 
-  const channel = supabase
-    .channel("reports-stats-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, () => {
-      if (role === "superadmin" || (role === "admin" && departmentId)) {
-        fetchStats();
+        if (error) {
+          console.error("Error fetching stats:", error);
+        } else if (data && data.length > 0) {
+          setStats(data[0]);
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      } finally {
+        setLoading(false);
       }
-    })
-    .subscribe();
+    };
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [role, departmentId]);
+    fetchStats();
 
+    const channel = supabase
+      .channel("reports-stats-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, () => {
+        fetchStats();
+      })
+      .subscribe();
 
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
-  if (loading || !role) {
+  if (loading) {
     return <div className="p-4 text-center text-zinc-400">Loading analytics...</div>;
   }
 
   return (
-    <div className="flex flex-col w-full h-full p-4 bg-linear-90 from-[#000046] to-[#1CB5E0] rounded-xl border-4 ">
+    <div className="flex flex-col w-full h-full p-4 bg-gray-900 rounded-xl">
       <div className="flex flex-1 gap-4">
         <StatCard title="Total Reports" value={stats.total} color="text-blue-400" />
-        <StatCard title="Pending Reports" value={stats.pending} color="text-orange-500" />
-        <StatCard title="Completed Reports" value={stats.completed} color="text-green-500" />
+        <StatCard title="Pending Reports" value={stats.pending} color="text-orange-400" />
+        <StatCard title="Completed Reports" value={stats.completed} color="text-green-400" />
       </div>
     </div>
   );
